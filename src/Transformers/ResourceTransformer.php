@@ -6,7 +6,6 @@ use DeveoDK\Core\Manager\Parsers\RequestParameterParser;
 use DeveoDK\Core\Manager\Resources\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\Resource;
 use Illuminate\Http\Resources\MergeValue;
 use Illuminate\Http\Resources\MissingValue;
 use Illuminate\Http\Response;
@@ -233,22 +232,40 @@ abstract class ResourceTransformer
             return $array;
         }
 
-        foreach ($array as $i => $transformable) {
-            foreach ($transformable as $key => $value) {
-                if ($value instanceof Relation) {
-                    $transformable[$key] = $value->getData();
-                    continue;
-                }
+        if ($array instanceof Collection || $array instanceof LengthAwarePaginator) {
+            foreach ($array as $i => $transformable) {
+                foreach ($transformable as $key => $value) {
+                    if ($value instanceof Relation) {
+                        $transformable[$key] = $value->getData();
+                        continue;
+                    }
 
-                if (in_array($key, $fieldsSelected)) {
-                    continue;
-                }
+                    if (in_array($key, $fieldsSelected)) {
+                        continue;
+                    }
 
-                unset($transformable[$key]);
+                    unset($transformable[$key]);
+                }
+                // Set current array item to filtered
+                $array[$i] = $transformable;
             }
-            // Set current array item to filtered
-            $array[$i] = $transformable;
+
+            return $array;
         }
+
+        foreach ($array as $key => $value) {
+            if ($value instanceof Relation) {
+                $array[$key] = $value->getData();
+                continue;
+            }
+
+            if (in_array($key, $fieldsSelected)) {
+                continue;
+            }
+
+            unset($array[$key]);
+        }
+
 
         return $array;
     }
