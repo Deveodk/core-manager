@@ -1,5 +1,5 @@
 {
-    "name": "deveo/core-manager",
+    "name": "deveodk/core-manager",
     "autoload": {
         "psr-4": {
             "DeveoDK\\Core\\Manager\\": "src/"
