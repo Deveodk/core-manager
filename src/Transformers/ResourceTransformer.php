@@ -232,7 +232,7 @@ abstract class ResourceTransformer
             return $array;
         }
 
-        if ($array instanceof Collection || $array instanceof LengthAwarePaginator) {
+        if (count($array) <= 2) {
             foreach ($array as $i => $transformable) {
                 foreach ($transformable as $key => $value) {
                     if ($value instanceof Relation) {
