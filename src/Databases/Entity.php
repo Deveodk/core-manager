@@ -11,7 +11,7 @@ class Entity extends Model
     use SoftDeletes, Uuid;
 
     /** @var bool */
-    protected $incrementing = false;
+    public $incrementing = false;
 
     /** @var string */
     protected $keyType = 'string';
