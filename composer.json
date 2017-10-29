@@ -7,7 +7,8 @@
     },
     "require": {
         "laravel/framework": "5.5.*",
-        "spatie/array-to-xml": "^2.7"
+        "spatie/array-to-xml": "^2.7",
+        "marquine/eloquent-uuid": "^1.0"
     },
     "require-dev": {
         "mockery/mockery": "0.9.*",
