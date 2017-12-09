@@ -3,6 +3,7 @@
 namespace DeveoDK\Core\Manager\Transformers;
 
 use DeveoDK\Core\Manager\Parsers\RequestParameterParser;
+use DeveoDK\Core\Manager\Resources\EmptyRelation;
 use DeveoDK\Core\Manager\Resources\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,7 +49,7 @@ abstract class ResourceTransformer
 
     /**
      * @param $data
-     * @return mixed
+     * @return array
      */
     public function transform($data)
     {
@@ -59,9 +60,9 @@ abstract class ResourceTransformer
             $this->withPaginator($data);
         }
 
-        $transformed = [];
-
         if ($data instanceof Collection || $data instanceof LengthAwarePaginator) {
+            $transformed = [];
+
             foreach ($data as $transformable) {
                 // Save in temp var for relations
                 $this->data = $transformable;
@@ -69,19 +70,19 @@ abstract class ResourceTransformer
 
                 array_push($transformed, $array);
             }
-        } elseif (is_null($data)) {
-            // Do nothing
-        } else {
-            // Save in temp var for relations
-            $this->data = $data;
-            $array = $this->resourceData($data);
 
-            $transformed = $array;
+            return $this->filter($transformed);
         }
 
-        $data = $this->removeUnselectedFields($transformed);
+        if (is_null($data)) {
+            return [];
+        }
 
-        return $this->filter($data);
+        // Save in temp var for relations
+        $this->data = $data;
+        $array = $this->resourceData($data);
+
+        return $this->filter($array);
     }
 
     /**
@@ -155,6 +156,8 @@ abstract class ResourceTransformer
                 return $formatter->toXML($data, $status);
             case 'yaml':
                 return $formatter->toYaml($data, $status);
+            case 'yml':
+                return $formatter->toYaml($data, $status);
             case 'json':
                 return $formatter->toJson($data, $status);
             default:
@@ -163,137 +166,54 @@ abstract class ResourceTransformer
     }
 
     /**
-     * Filter the given data, removing any optional values.
-     *
-     * @param  array  $data
-     * @return array
-     */
-    protected function filter($data)
-    {
-        $index = -1;
-
-        foreach ($data as $key => $value) {
-            $index++;
-
-            if ($value instanceof Relation) {
-                $data[$key] = $value->getData();
-                continue;
-            }
-
-            if (is_array($value)) {
-                $data[$key] = $this->filter($value);
-
-                continue;
-            }
-
-            if (is_numeric($key) && $value instanceof MergeValue) {
-                return $this->merge($data, $index, $this->filter($value->data));
-            }
-
-            if ($value instanceof MissingValue ||
-                ($value instanceof self &&
-                    $value->resource instanceof MissingValue)) {
-                unset($data[$key]);
-
-                $index--;
-            }
-
-            if ($value instanceof self && is_null($value->resource)) {
-                $data[$key] = null;
-            }
-        }
-
-        return $data;
-    }
-
-    /**
-     * Merge the given data in at the given index.
-     *
-     * @param  array  $data
-     * @param  int  $index
-     * @param  array  $merge
-     * @return array
-     */
-    protected function merge($data, $index, $merge)
-    {
-        if (array_values($data) === $data) {
-            return array_merge(
-                array_merge(array_slice($data, 0, $index, true), $merge),
-                $this->filter(array_slice($data, $index + 1, null, true))
-            );
-        }
-
-        return array_slice($data, 0, $index, true) +
-            $merge +
-            $this->filter(array_slice($data, $index + 1, null, true));
-    }
-
-    /**
      * @param $array
-     * @return mixed
+     * @return array
      */
-    protected function removeUnselectedFields($array)
+    protected function filter($array)
     {
         $fieldsSelected = isset($this->getOptions()['fields']) ? $this->getOptions()['fields'] : null;
 
-        if ($fieldsSelected === null) {
-            return $array;
-        }
-
-        if (count($array) >= 2) {
-            foreach ($array as $i => $transformable) {
-                foreach ($transformable as $key => $value) {
-                    if ($value instanceof Relation) {
-                        $transformable[$key] = $value->getData();
-                        continue;
-                    }
-
-                    if (in_array($key, $fieldsSelected)) {
-                        continue;
-                    }
-
-                    unset($transformable[$key]);
-                }
-
-                // Set current array item to filtered
-                $array[$i] = $transformable;
+        foreach ($array as $key => $value) {
+            // Call recurse if array and combine the keys
+            if (is_array($value)) {
+                $array[$key] = $this->filter($value);
+                continue;
             }
 
-            return $array;
-        }
-
-        foreach ($array as $key => $value) {
             if ($value instanceof Relation) {
                 $array[$key] = $value->getData();
                 continue;
             }
 
-            if (in_array($key, $fieldsSelected)) {
+            if ($value instanceof EmptyRelation) {
+                $array[$key] = null;
                 continue;
             }
 
-            unset($array[$key]);
-        }
+            if ($value instanceof MergeValue) {
+                $mergeData = $value->data;
+                $mergeData = $this->filter($mergeData);
 
+                foreach ($mergeData as $index => $data) {
+                    $array[$index] = $data;
+                }
+
+                unset($array[$key]);
+            }
+
+            if ($value instanceof MissingValue) {
+                unset($array[$key]);
+            }
+
+            if (!is_null($fieldsSelected)) {
+                if (!in_array($key, $fieldsSelected)) {
+                    unset($array[$key]);
+                    continue;
+                }
+            }
+        }
 
         return $array;
-    }
-
-    /**
-     * Retrieve a value based on a given condition.
-     *
-     * @param  bool  $condition
-     * @param  mixed  $value
-     * @param  mixed  $default
-     * @return mixed
-     */
-    protected function when($condition, $value, $default = null)
-    {
-        if ($condition) {
-            return value($value);
-        }
-
-        return func_num_args() === 3 ? value($default) : null;
     }
 
     /**
@@ -330,6 +250,23 @@ abstract class ResourceTransformer
     protected function mergeWhen($condition, $value)
     {
         return $condition ? new MergeValue(value($value)) : new MissingValue;
+    }
+
+    /**
+     * Retrieve a value based on a given condition.
+     *
+     * @param  bool  $condition
+     * @param  mixed  $value
+     * @param  mixed  $default
+     * @return mixed
+     */
+    protected function when($condition, $value, $default = null)
+    {
+        if ($condition) {
+            return value($value);
+        }
+
+        return func_num_args() === 3 ? value($default) : null;
     }
 
     /**

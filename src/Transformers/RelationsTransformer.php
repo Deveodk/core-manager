@@ -2,6 +2,7 @@
 
 namespace DeveoDK\Core\Manager\Transformers;
 
+use DeveoDK\Core\Manager\Resources\EmptyRelation;
 use DeveoDK\Core\Manager\Resources\Relation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\MissingValue;
@@ -9,25 +10,25 @@ use Illuminate\Http\Resources\MissingValue;
 trait RelationsTransformer
 {
     /**
-     * @param string $resourceName
+     * @param string $relationName
      * @param string $transformer
      * @return mixed|null
      */
-    protected function includes($resourceName, $transformer)
+    protected function includes($relationName, $transformer)
     {
         /** @var Model $model */
         $model = $this->data;
 
         // When relation does not exist
-        if (!$this->relationExist($model, $resourceName)) {
+        if (!$this->relationExist($model, $relationName)) {
             return new MissingValue();
         }
 
-        $data = $model->{$resourceName};
+        $data = $model->{$relationName};
 
         // If relation is empty
         if (count($data) === 0) {
-            return null;
+            return new EmptyRelation();
         }
 
         /** @var ResourceTransformer $resourceTransformer */
@@ -46,6 +47,6 @@ trait RelationsTransformer
      */
     private function relationExist($model, $relationName)
     {
-        return isset($model->getRelations()[$relationName]);
+        return array_key_exists($relationName, $model->getRelations());
     }
 }

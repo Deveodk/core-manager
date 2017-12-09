@@ -15,11 +15,18 @@ trait RequestParameterParser
     /** @var Request */
     protected $request;
 
+    /**
+     * RequestParameterParser constructor.
+     * @param Request $request
+     */
     public function __construct(Request $request)
     {
         $this->request = $request;
     }
 
+    /**
+     * @return array
+     */
     public function parseResourceOptions()
     {
         $request = $this->request;
@@ -35,13 +42,13 @@ trait RequestParameterParser
         ], $this->defaults);
 
         $options = [
-            'includes' => $request->get('includes') ? $request->get('includes') : $this->defaults['includes'],
-            'sort' => $request->get('sort') ? $request->get('sort') : $this->defaults['sort'],
-            'limit' => $request->get('limit') ? $request->get('limit') : $this->defaults['limit'],
-            'page' => $request->get('page') ? $request->get('page') : $this->defaults['page'],
-            'filters' => $request->get('filters') ? $request->get('filters') : $this->defaults['filters'],
-            'fields' => $request->get('fields') ? $request->get('fields') : $this->defaults['fields'],
-            'format' => $request->get('format') ? $request->get('format') : $this->defaults['format'],
+            'includes' => $request->get('includes') ? trim($request->get('includes')) : $this->defaults['includes'],
+            'sort' => $request->get('sort') ? trim($request->get('sort')) : $this->defaults['sort'],
+            'limit' => $request->get('limit') ? trim($request->get('limit')) : $this->defaults['limit'],
+            'page' => $request->get('page') ? trim($request->get('page')) : $this->defaults['page'],
+            'filters' => $request->get('filters') ? trim($request->get('filters')) : $this->defaults['filters'],
+            'fields' => $request->get('fields') ? trim($request->get('fields')) : $this->defaults['fields'],
+            'format' => $request->get('format') ? trim($request->get('format')) : $this->defaults['format'],
         ];
 
         $includes = $this->parseIncludes($options['includes']);
@@ -79,13 +86,15 @@ trait RequestParameterParser
         $includes = [];
 
         foreach ($rawIncludes as $include) {
+            $formattedInclude = camel_case($include);
+
             // If alias of field
-            if (key_exists($include, $this->includesAlias)) {
-                array_push($includes, $this->includesAlias[$include]);
+            if (key_exists($formattedInclude, $this->includesAlias)) {
+                array_push($includes, $this->includesAlias[$formattedInclude]);
                 continue;
             }
 
-            array_push($includes, $include);
+            array_push($includes, $formattedInclude);
         }
 
         return $includes;
@@ -201,6 +210,7 @@ trait RequestParameterParser
 
     protected function parseFilters()
     {
+        // TODO implement filters
     }
 
     /**
