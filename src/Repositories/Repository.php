@@ -12,6 +12,7 @@ use Illuminate\Cache\Repository as cacheRepository;
 
 abstract class Repository
 {
+    /** @var string */
     const CACHE_PREFIX = 'CORE_MANAGER_COLUMNS_';
 
     /** @var Model */
@@ -43,26 +44,34 @@ abstract class Repository
     /**
      * @param $id
      * @param array $options
-     * @return Collection|Model|null|static|static[]
+     * @return Model|null
      */
     public function findById($options, $id)
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = $this->parseColumnsToInclude($options['fields']);
+        $fields = null;
+
+        if (isset($options['fields'])) {
+            $fields = $this->parseColumnsToInclude($options['fields']);
+        }
 
         return $builder->find($id, $fields);
     }
 
     /**
      * @param array $options
-     * @return Collection|static[]
+     * @return Model[]|null
      */
     public function findAll($options)
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = $this->parseColumnsToInclude($options['fields']);
+        $fields = null;
+
+        if (isset($options['fields'])) {
+            $fields = $this->parseColumnsToInclude($options['fields']);
+        }
 
         if (isset($options['page'])) {
             return $builder->paginate($options['limit'], $fields, 'page', $options['page']);
@@ -76,13 +85,17 @@ abstract class Repository
      * @param $attribute
      * @param null $operator
      * @param null $value
-     * @return Collection|static[]
+     * @return Model[]|null
      */
     public function findAllWhere($options, $attribute, $operator = null, $value = null)
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = $this->parseColumnsToInclude($options['fields']);
+        $fields = null;
+
+        if (isset($options['fields'])) {
+            $fields = $this->parseColumnsToInclude($options['fields']);
+        }
 
         return $builder->where($attribute, $operator, $value)->get($fields);
     }
@@ -91,13 +104,17 @@ abstract class Repository
      * @param $options
      * @param $attribute
      * @param array $values
-     * @return Collection|static[]
+     * @return Model[]|null
      */
     public function findAllWhereIn($options, $attribute, array $values)
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = $this->parseColumnsToInclude($options['fields']);
+        $fields = null;
+
+        if (isset($options['fields'])) {
+            $fields = $this->parseColumnsToInclude($options['fields']);
+        }
 
         return $builder->whereIn($attribute, $values)->get($fields);
     }
@@ -130,13 +147,17 @@ abstract class Repository
      * @param $options
      * @param $attribute
      * @param $value
-     * @return Model|null|static
+     * @return Model|null
      */
     public function findBy($options, $attribute, $value)
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = $this->parseColumnsToInclude($options['fields']);
+        $fields = null;
+
+        if (isset($options['fields'])) {
+            $fields = $this->parseColumnsToInclude($options['fields']);
+        }
 
         return $builder->where($attribute, $value)->first($fields);
     }
@@ -153,12 +174,12 @@ abstract class Repository
     /**
      * @param $value
      * @param string $attribute
-     * @return Model|void
+     * @return bool
      */
     public function delete($value, $attribute = 'id')
     {
         $queryBuilder = $this->getQueryBuilder();
-        $queryBuilder->where($attribute, $value)->delete();
+        return $queryBuilder->where($attribute, $value)->delete();
     }
 
     /**
@@ -170,6 +191,7 @@ abstract class Repository
         if ($this->authorization) {
             return $this->authorization;
         }
+
         return $this->entity->newQuery();
     }
 
