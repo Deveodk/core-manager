@@ -63,6 +63,7 @@ abstract class ResourceTransformer
 
         if ($data instanceof Collection || $data instanceof LengthAwarePaginator) {
             foreach ($data as $transformable) {
+                // Save in temp var for relations
                 $this->data = $transformable;
                 $array = $this->resourceData($transformable);
 
@@ -71,6 +72,7 @@ abstract class ResourceTransformer
         } elseif (is_null($data)) {
             // Do nothing
         } else {
+            // Save in temp var for relations
             $this->data = $data;
             $array = $this->resourceData($data);
 
@@ -84,11 +86,12 @@ abstract class ResourceTransformer
 
     /**
      * @param $data
+     * @param int $status
      * @return JsonResponse|Response
      */
-    public function transformToResponse($data)
+    public function transformToResponse($data, int $status = 200)
     {
-        return $this->toResponse($this->transform($data));
+        return $this->toResponse($this->transform($data), $status);
     }
 
     /**
@@ -138,6 +141,11 @@ abstract class ResourceTransformer
         return sprintf('%s&%s', $url, $queryString);
     }
 
+    /**
+     * @param $data
+     * @param int $status
+     * @return JsonResponse|Response
+     */
     protected function toResponse($data, $status = 200)
     {
         $formatter = $this->formatter;
@@ -226,13 +234,13 @@ abstract class ResourceTransformer
      */
     protected function removeUnselectedFields($array)
     {
-        $fieldsSelected = $this->getOptions()['fields'];
+        $fieldsSelected = isset($this->getOptions()['fields']) ? $this->getOptions()['fields'] : null;
 
         if ($fieldsSelected === null) {
             return $array;
         }
 
-        if (count($array) <= 2) {
+        if (count($array) >= 2) {
             foreach ($array as $i => $transformable) {
                 foreach ($transformable as $key => $value) {
                     if ($value instanceof Relation) {
@@ -246,6 +254,7 @@ abstract class ResourceTransformer
 
                     unset($transformable[$key]);
                 }
+
                 // Set current array item to filtered
                 $array[$i] = $transformable;
             }

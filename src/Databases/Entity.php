@@ -3,16 +3,9 @@
 namespace DeveoDK\Core\Manager\Databases;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Marquine\EloquentUuid\Uuid;
 
 class Entity extends Model
 {
-    use SoftDeletes, Uuid;
-
-    /** @var bool */
-    public $incrementing = false;
-
     /** @var string */
     protected $keyType = 'string';
 
@@ -20,7 +13,6 @@ class Entity extends Model
     protected $dates = [
         'created_at',
         'updated_at',
-        'deleted_at'
     ];
 
     /** @var array */

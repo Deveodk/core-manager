@@ -2,15 +2,33 @@
 
 namespace DeveoDK\Core\Manager\Databases;
 
+use Carbon\Carbon;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Cache\Repository as CacheRepository;
 
 class ElequentBuilder
 {
+    /** @var string */
+    const CACHE_PREFIX = 'CORE_MANAGER_COLUMNS_';
+
     /** @var Builder */
     protected $queryBuilder;
+
+    /** @var CacheRepository */
+    protected $cache;
+
+    /** @var DatabaseManager */
+    protected $databaseManager;
+
+    public function __construct()
+    {
+        $this->cache = app(CacheRepository::class);
+        $this->databaseManager = app(DatabaseManager::class);
+    }
 
     /**
      * @param Builder $queryBuilder
@@ -20,6 +38,9 @@ class ElequentBuilder
     public function buildResourceOptions(Builder $queryBuilder, array $options = [])
     {
         $this->queryBuilder = $queryBuilder;
+
+        // Set includes default value
+        $includes = null;
 
         // Extract array into variables
         extract($options);
@@ -34,6 +55,10 @@ class ElequentBuilder
 
         if (isset($limit)) {
             $this->parseLimit($limit);
+        }
+
+        if (isset($fields)) {
+            $this->parseFields($fields, $includes);
         }
 
         return $this->getQueryBuilder();
@@ -119,6 +144,64 @@ class ElequentBuilder
         }
 
         return $queryBuilder;
+    }
+
+    /**
+     * @param $fields
+     * @param $includes
+     * @return Builder|null
+     */
+    protected function parseFields($fields, $includes)
+    {
+        if (is_null($fields)) {
+            return $fields;
+        }
+
+        $queryBuilder = $this->getQueryBuilder();
+        $tableName = $queryBuilder->getModel()->getTable();
+        $columns = $this->getDatabaseColumns($tableName);
+
+        $columnsToInclude = [];
+
+        // field aliases all ready applied from parser
+        foreach ($fields as $field) {
+            if (in_array($field, $columns)) {
+                array_push($columnsToInclude, $field);
+            }
+        }
+
+        if ($includes) {
+            // When includes then select the column manually
+            foreach ($includes as $include) {
+                foreach ($columns as $column) {
+                    if (str_contains($column, $include)) {
+                        array_push($columnsToInclude, $column);
+                    }
+                }
+            }
+        }
+
+        if (count($columnsToInclude) === 0) {
+            return null;
+        }
+
+        return $queryBuilder->select($columnsToInclude);
+    }
+
+    /**
+     * @param $tableName
+     * @return array
+     */
+    protected function getDatabaseColumns($tableName)
+    {
+        $timeToRemember = Carbon::now()->addHour();
+
+        $columns = $this->cache
+            ->remember(self::CACHE_PREFIX . $tableName, $timeToRemember, function () use ($tableName) {
+                return $this->databaseManager->getSchemaBuilder()->getColumnListing($tableName);
+            });
+
+        return $columns;
     }
 
     /**

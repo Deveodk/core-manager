@@ -2,19 +2,12 @@
 
 namespace DeveoDK\Core\Manager\Repositories;
 
-use Carbon\Carbon;
 use DeveoDK\Core\Manager\Databases\ElequentBuilder;
-use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Cache\Repository as cacheRepository;
 
 abstract class Repository
 {
-    /** @var string */
-    const CACHE_PREFIX = 'CORE_MANAGER_COLUMNS_';
-
     /** @var Model */
     protected $entity;
 
@@ -24,12 +17,6 @@ abstract class Repository
     /** @var ElequentBuilder */
     protected $elequentBuilder;
 
-    /** @var DatabaseManager */
-    protected $databaseManager;
-
-    /** @var cacheRepository */
-    protected $cache;
-
     /**
      * Repository constructor.
      */
@@ -37,8 +24,6 @@ abstract class Repository
     {
         $this->entity = $this->getEntity();
         $this->elequentBuilder = app(ElequentBuilder::class);
-        $this->databaseManager = app(DatabaseManager::class);
-        $this->cache = app(cacheRepository::class);
     }
 
     /**
@@ -50,13 +35,7 @@ abstract class Repository
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = null;
-
-        if (isset($options['fields'])) {
-            $fields = $this->parseColumnsToInclude($options['fields']);
-        }
-
-        return $builder->find($id, $fields);
+        return $builder->find($id);
     }
 
     /**
@@ -67,17 +46,11 @@ abstract class Repository
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = null;
-
-        if (isset($options['fields'])) {
-            $fields = $this->parseColumnsToInclude($options['fields']);
-        }
-
         if (isset($options['page'])) {
-            return $builder->paginate($options['limit'], $fields, 'page', $options['page']);
+            return $builder->paginate($options['limit'], null, 'page', $options['page']);
         }
 
-        return $builder->get($fields);
+        return $builder->get();
     }
 
     /**
@@ -91,13 +64,13 @@ abstract class Repository
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = null;
-
-        if (isset($options['fields'])) {
-            $fields = $this->parseColumnsToInclude($options['fields']);
+        if (isset($options['page'])) {
+            return $builder
+                ->where($attribute, $operator, $value)
+                ->paginate($options['limit'], null, 'page', $options['page']);
         }
 
-        return $builder->where($attribute, $operator, $value)->get($fields);
+        return $builder->where($attribute, $operator, $value)->get();
     }
 
     /**
@@ -110,13 +83,13 @@ abstract class Repository
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = null;
-
-        if (isset($options['fields'])) {
-            $fields = $this->parseColumnsToInclude($options['fields']);
+        if (isset($options['page'])) {
+            return $builder
+                ->whereIn($attribute, $values)
+                ->paginate($options['limit'], null, 'page', $options['page']);
         }
 
-        return $builder->whereIn($attribute, $values)->get($fields);
+        return $builder->whereIn($attribute, $values)->get();
     }
 
     /**
@@ -153,13 +126,7 @@ abstract class Repository
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
-        $fields = null;
-
-        if (isset($options['fields'])) {
-            $fields = $this->parseColumnsToInclude($options['fields']);
-        }
-
-        return $builder->where($attribute, $value)->first($fields);
+        return $builder->where($attribute, $value)->first();
     }
 
     /**
@@ -193,51 +160,6 @@ abstract class Repository
         }
 
         return $this->entity->newQuery();
-    }
-
-    /**
-     * @param array|null $fields
-     * @return array
-     */
-    public function parseColumnsToInclude($fields)
-    {
-        if (is_null($fields)) {
-            return $fields;
-        }
-
-        $tableName = $this->getEntity()->getTable();
-        $columns = $this->getDatabaseColumns($tableName);
-
-        $columnsToInclude = [];
-
-        // field aliases all ready applied from parser
-        foreach ($fields as $field) {
-            if (in_array($field, $columns)) {
-                array_push($columnsToInclude, $field);
-            }
-        }
-
-        if (count($columnsToInclude) === 0) {
-            return null;
-        }
-
-        return $columnsToInclude;
-    }
-
-    /**
-     * @param $tableName
-     * @return array
-     */
-    protected function getDatabaseColumns($tableName)
-    {
-        $timeToRemember = Carbon::now()->addHour();
-
-        $columns = $this->cache
-            ->remember(self::CACHE_PREFIX . $tableName, $timeToRemember, function () use ($tableName) {
-                return $this->databaseManager->getSchemaBuilder()->getColumnListing($tableName);
-            });
-
-        return $columns;
     }
 
     /**
