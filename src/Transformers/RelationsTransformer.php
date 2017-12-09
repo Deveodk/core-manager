@@ -31,7 +31,7 @@ trait RelationsTransformer
         }
 
         // If relation is empty
-        if (count($data) === 0) {
+        if (empty($data) === 0) {
             return new EmptyRelation();
         }
 
