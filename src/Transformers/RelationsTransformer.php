@@ -26,6 +26,10 @@ trait RelationsTransformer
 
         $data = $model->{$relationName};
 
+        if (is_null($data)) {
+            return new EmptyRelation();
+        }
+
         // If relation is empty
         if (count($data) === 0) {
             return new EmptyRelation();
