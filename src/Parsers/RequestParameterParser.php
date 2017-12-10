@@ -63,13 +63,16 @@ trait RequestParameterParser
 
         $format = $this->parseFormat($options['format']);
 
+        $filters = $this->parseFilters($options['filters']);
+
         $this->options = [
             'includes' => $includes,
             'sort' => $sort,
             'limit' => $limit,
             'page' => $page,
             'fields' => $fields,
-            'format' => $format
+            'format' => $format,
+            'filters' => $filters,
         ];
 
         return $this->options;
@@ -208,9 +211,52 @@ trait RequestParameterParser
         return $fields;
     }
 
-    protected function parseFilters()
+    /**
+     * @param $filters
+     * @return array|null
+     */
+    protected function parseFilters($filters)
     {
-        // TODO implement filters
+        if (is_null($filters)) {
+            return null;
+        }
+
+        $rawFilters = explode(',', $filters);
+
+        $filtersArray = [];
+
+        foreach ($rawFilters as $filter) {
+            $rawArray = explode(':', $filter);
+
+            if (!is_array($rawArray)) {
+                continue;
+            }
+
+            if (count($rawArray) !== 3) {
+                continue;
+            }
+
+            $field = trim($rawArray[0]);
+            $operator = trim($rawArray[1]);
+            $value = trim($rawArray[2]);
+
+            // Handle boolean values
+            if ($value === 'true') {
+                $value = true;
+            }
+
+            if ($value === 'false') {
+                $value = false;
+            }
+
+            array_push($filtersArray, [
+                'field' => $field,
+                'operator' => $operator,
+                'value' => $value
+            ]);
+        }
+
+        return $filtersArray;
     }
 
     /**

@@ -61,6 +61,10 @@ class ElequentBuilder
             $this->parseFields($fields, $includes);
         }
 
+        if (isset($filters)) {
+            $this->parseFilters($filters);
+        }
+
         return $this->getQueryBuilder();
     }
 
@@ -186,6 +190,71 @@ class ElequentBuilder
         }
 
         return $queryBuilder->select($columnsToInclude);
+    }
+
+    /**
+     * @param $filters
+     * @return Builder|null
+     */
+    protected function parseFilters($filters)
+    {
+        $queryBuilder = $this->getQueryBuilder();
+        $tableName = $queryBuilder->getModel()->getTable();
+
+        if (is_null($filters)) {
+            return null;
+        }
+
+        foreach ($filters as $filter) {
+            $field = $filter['field'];
+            $operator = $filter['operator'];
+            $value = $filter['value'];
+
+            $columns = $this->getDatabaseColumns($tableName);
+
+            if (!in_array($field, $columns)) {
+                continue;
+            }
+
+            $whereOperators = ['=', '!=', '<', '>', '>=', '<=', '<>', 'like'];
+
+            if (in_array($operator, $whereOperators)) {
+                $queryBuilder->where($field, $operator, $value);
+                continue;
+            }
+
+            switch ($operator) {
+                case 'between':
+                    $queryBuilder->whereBetween($field, $value);
+                    break;
+                case 'not_between':
+                    $queryBuilder->whereNotBetween($field, $value);
+                    break;
+                case 'in':
+                    $queryBuilder->whereIn($field, $value);
+                    break;
+                case 'not_in':
+                    $queryBuilder->whereNotIn($field, $value);
+                    break;
+                case 'month':
+                    $queryBuilder->whereMonth($field, $value);
+                    break;
+                case 'day':
+                    $queryBuilder->whereDay($field, $value);
+                    break;
+                case 'date':
+                    $queryBuilder->whereDate($field, $value);
+                    break;
+                case 'year':
+                    $queryBuilder->whereYear($field, $value);
+                    break;
+                case 'time':
+                    $queryBuilder->whereTime($field, '=', $value);
+                    break;
+            }
+        }
+
+        return $queryBuilder;
     }
 
     /**
