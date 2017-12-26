@@ -25,7 +25,7 @@ Core components are an opinionated approach to designing modern Application Prog
 
 ## What it does
 
-core-manager ...
+*This is yet to be documented ...*
 
 ---
 
