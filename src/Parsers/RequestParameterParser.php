@@ -33,7 +33,7 @@ trait RequestParameterParser
 
         $this->defaults = array_merge([
             'includes' => null,
-            'sort' => null,
+            'sorts' => null,
             'limit' => null,
             'page' => null,
             'filters' => null,
@@ -43,7 +43,7 @@ trait RequestParameterParser
 
         $options = [
             'includes' => $request->get('includes') ? trim($request->get('includes')) : $this->defaults['includes'],
-            'sort' => $request->get('sort') ? trim($request->get('sort')) : $this->defaults['sort'],
+            'sorts' => $request->get('sorts') ? trim($request->get('sorts')) : $this->defaults['sorts'],
             'limit' => $request->get('limit') ? trim($request->get('limit')) : $this->defaults['limit'],
             'page' => $request->get('page') ? trim($request->get('page')) : $this->defaults['page'],
             'filters' => $request->get('filters') ? trim($request->get('filters')) : $this->defaults['filters'],
@@ -53,7 +53,7 @@ trait RequestParameterParser
 
         $includes = $this->parseIncludes($options['includes']);
 
-        $sort = $this->parseSort($options['sort']);
+        $sorts = $this->parseSorts($options['sorts']);
 
         $limit = $this->parseLimit($options['limit']);
 
@@ -67,7 +67,7 @@ trait RequestParameterParser
 
         $this->options = [
             'includes' => $includes,
-            'sort' => $sort,
+            'sorts' => $sorts,
             'limit' => $limit,
             'page' => $page,
             'fields' => $fields,
@@ -78,6 +78,11 @@ trait RequestParameterParser
         return $this->options;
     }
 
+    /**
+     * Parse includes into array
+     * @param $includes
+     * @return array|null
+     */
     protected function parseIncludes($includes)
     {
         if (is_null($includes)) {
@@ -89,6 +94,10 @@ trait RequestParameterParser
         $includes = [];
 
         foreach ($rawIncludes as $include) {
+            if (empty($include)) {
+                continue;
+            }
+
             $formattedInclude = camel_case($include);
 
             // If alias of field
@@ -107,49 +116,45 @@ trait RequestParameterParser
      * @param $sort
      * @return array|null
      */
-    protected function parseSort($sort)
+    protected function parseSorts($sort)
     {
         if (is_null($sort)) {
             return null;
         }
 
-        $rawSort = explode(',', $sort);
+        $rawSorts = explode(',', $sort);
 
-        $sortArray = [];
+        $sortsArray = [];
 
-        foreach ($rawSort as $sorting) {
-            $directionParse = explode(':', $sorting);
+        foreach ($rawSorts as $sorting) {
+            $rawSort = explode(':', $sorting);
 
-            $direction = 'asc';
-
-            $tableColumn = $directionParse[0];
-
-            // If direction is not given default to ascending
-            if (count($directionParse) === 2) {
-                $direction = $directionParse[1];
+            if (!isset($rawSort[0])) {
+                continue;
             }
 
-            // If non existing order default to desc
-            $direction = mb_strtolower($direction) === 'asc' ? 'ASC' : 'DESC';
+            $column = $rawSort[0];
+            $direction = 'ASC';
+            $table = null;
 
-            $columnParser = explode('.', $tableColumn);
-
-            if (count($columnParser) === 2) {
-                $table = $columnParser[0];
-                $column = $columnParser[1];
-            } else {
-                $table = null;
-                $column = $columnParser[0];
+            // Direction isset
+            if (isset($rawSort[1])) {
+                $direction = mb_strtolower($rawSort[1]) === 'asc' ? 'ASC' : 'DESC';
             }
 
-            array_push($sortArray, [
+            // Table is set
+            if (isset($rawSort[2])) {
+                $table = mb_strtolower($rawSort[2]);
+            }
+
+            array_push($sortsArray, [
+                'column' => $column,
                 'direction' => $direction,
                 'table' => $table,
-                'column' => $column
             ]);
         }
 
-        return $sortArray;
+        return $sortsArray;
     }
 
     /**
@@ -162,7 +167,7 @@ trait RequestParameterParser
             return null;
         }
 
-        return $limit;
+        return (int) $limit;
     }
 
     /**
@@ -175,7 +180,7 @@ trait RequestParameterParser
             return null;
         }
 
-        return $page;
+        return (int) $page;
     }
 
     /**
@@ -194,6 +199,10 @@ trait RequestParameterParser
         $fields = [];
 
         foreach ($rawFields as $field) {
+            if (empty($field)) {
+                continue;
+            }
+
             // If alias of field
             if (key_exists($field, $this->fieldAliases)) {
                 array_push($fields, $this->fieldAliases[$field]);
@@ -240,7 +249,12 @@ trait RequestParameterParser
             $operator = trim($rawArray[1]);
             $value = trim($rawArray[2]);
 
-            // Handle boolean values
+            // If array of values given
+            if (str_contains($value, '|')) {
+                $value = explode('|', $value);
+            }
+
+            // Handle bool values
             if ($value === 'true') {
                 $value = true;
             }
@@ -271,6 +285,8 @@ trait RequestParameterParser
             case 'json':
                 return 'json';
             case 'yaml':
+                return 'yaml';
+            case 'yml':
                 return 'yaml';
             default:
                 return 'json';

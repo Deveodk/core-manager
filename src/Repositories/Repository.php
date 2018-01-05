@@ -3,12 +3,13 @@
 namespace DeveoDK\Core\Manager\Repositories;
 
 use DeveoDK\Core\Manager\Databases\ElequentBuilder;
+use DeveoDK\Core\Manager\Databases\Entity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 abstract class Repository
 {
-    /** @var Model */
+    /** @var Entity */
     protected $entity;
 
     /** @var Builder */
@@ -27,9 +28,15 @@ abstract class Repository
     }
 
     /**
+     * Return the Entity the repository should use.
+     * @return Entity
+     */
+    abstract public function getEntity();
+
+    /**
      * @param $id
      * @param array $options
-     * @return Model|null
+     * @return Entity|null
      */
     public function findById($options, $id)
     {
@@ -40,7 +47,7 @@ abstract class Repository
 
     /**
      * @param array $options
-     * @return Model[]|null
+     * @return Entity[]|null
      */
     public function findAll($options)
     {
@@ -55,12 +62,12 @@ abstract class Repository
 
     /**
      * @param $options
-     * @param $attribute
-     * @param null $operator
-     * @param null $value
-     * @return Model[]|null
+     * @param string $attribute
+     * @param string|null $operator
+     * @param string|null $value
+     * @return Entity[]|null
      */
-    public function findAllWhere($options, $attribute, $operator = null, $value = null)
+    public function findAllWhere($options, string $attribute, string $operator = null, string $value = null)
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
@@ -79,7 +86,7 @@ abstract class Repository
      * @param array $values
      * @return Model[]|null
      */
-    public function findAllWhereIn($options, $attribute, array $values)
+    public function findAllWhereIn($options, string $attribute, array $values)
     {
         $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
 
