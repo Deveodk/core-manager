@@ -4,7 +4,10 @@ namespace DeveoDK\Core\Manager\Repositories;
 
 use DeveoDK\Core\Manager\Databases\ElequentBuilder;
 use DeveoDK\Core\Manager\Databases\Entity;
+use DeveoDK\Core\Manager\Parsers\RequestParameters;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 abstract class Repository
@@ -24,7 +27,7 @@ abstract class Repository
     public function __construct()
     {
         $this->entity = $this->getEntity();
-        $this->elequentBuilder = app(ElequentBuilder::class);
+        $this->elequentBuilder = new ElequentBuilder();
     }
 
     /**
@@ -34,66 +37,70 @@ abstract class Repository
     abstract public function getEntity();
 
     /**
+     * @param RequestParameters $parameters
      * @param $id
-     * @param array $options
-     * @return Entity|null
+     * @return Entity|Model|null
      */
-    public function findById($options, $id)
+    public function findById(RequestParameters $parameters, $id)
     {
-        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
 
         return $builder->find($id);
     }
 
     /**
-     * @param array $options
-     * @return Entity[]|null
+     * @param RequestParameters $parameters
+     * @return LengthAwarePaginator|Collection
      */
-    public function findAll($options)
+    public function findAll(RequestParameters $parameters)
     {
-        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
 
-        if (isset($options['page'])) {
-            return $builder->paginate($options['limit'], null, 'page', $options['page']);
+        if ($parameters->getPage()) {
+            return $builder->paginate($parameters->getLimit(), null, 'page', $parameters->getPage());
         }
 
         return $builder->get();
     }
 
     /**
-     * @param $options
+     * @param RequestParameters $parameters
      * @param string $attribute
      * @param string|null $operator
      * @param string|null $value
-     * @return Entity[]|null
+     * @return LengthAwarePaginator|Collection
      */
-    public function findAllWhere($options, string $attribute, string $operator = null, string $value = null)
-    {
-        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
+    public function findAllWhere(
+        RequestParameters $parameters,
+        string $attribute,
+        string $operator = null,
+        string $value = null
+    ) {
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
 
         if (isset($options['page'])) {
             return $builder
                 ->where($attribute, $operator, $value)
-                ->paginate($options['limit'], null, 'page', $options['page']);
+                ->paginate($parameters->getLimit(), null, 'page', $parameters->getPage());
         }
 
         return $builder->where($attribute, $operator, $value)->get();
     }
 
     /**
-     * @param $options
+     * @param RequestParameters $parameters
      * @param $attribute
      * @param array $values
-     * @return Model[]|null
+     * @return LengthAwarePaginator|Collection
      */
-    public function findAllWhereIn($options, string $attribute, array $values)
+    public function findAllWhereIn(RequestParameters $parameters, $attribute, array $values)
     {
-        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
 
         if (isset($options['page'])) {
             return $builder
                 ->whereIn($attribute, $values)
-                ->paginate($options['limit'], null, 'page', $options['page']);
+                ->paginate($parameters->getLimit(), null, 'page', $parameters->getPage());
         }
 
         return $builder->whereIn($attribute, $values)->get();
@@ -101,63 +108,107 @@ abstract class Repository
 
     /**
      * Count all
-     * @param $options
+     * @param RequestParameters $parameters
      * @return int
      */
-    public function count($options)
+    public function count(RequestParameters $parameters)
     {
-        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
 
         return $builder->count();
     }
 
     /**
-     * @param $options
+     * @param RequestParameters $parameters
      * @param $attribute
+     * @param $operator
+     * @param $value
      * @return int
      */
-    public function sum($options, $attribute)
+    public function countWhere(RequestParameters $parameters, $attribute, $operator, $value)
     {
-        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
 
-        return $builder->sum($attribute);
+        return $builder->where($attribute, $operator, $value)->count();
     }
 
     /**
-     * @param $options
+     * @param RequestParameters $parameters
+     * @param $field
+     * @return int
+     */
+    public function sum(RequestParameters $parameters, $field)
+    {
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
+
+        return $builder->sum($field);
+    }
+
+    /**
+     * @param RequestParameters $parameters
+     * @param $field
      * @param $attribute
+     * @param $operator
      * @param $value
-     * @return Model|null
+     * @return int
      */
-    public function findBy($options, $attribute, $value)
+    public function sumWhere(RequestParameters $parameters, $field, $attribute, $operator, $value)
     {
-        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $options);
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
 
-        return $builder->where($attribute, $value)->first();
+        return $builder->where($attribute, $operator, $value)->sum($field);
     }
 
     /**
-     * @param $entity
-     * @return bool
-     */
-    public function save(Model $entity)
-    {
-        return $entity->save();
-    }
-
-    /**
+     * @param RequestParameters $parameters
+     * @param $attribute
+     * @param $operator
      * @param $value
-     * @param string $attribute
-     * @return bool
+     * @return Entity|Model|null
      */
-    public function delete($value, $attribute = 'id')
+    public function findBy(RequestParameters $parameters, $attribute, $operator, $value)
     {
-        $queryBuilder = $this->getQueryBuilder();
-        return $queryBuilder->where($attribute, $value)->delete();
+        $builder = $this->elequentBuilder->buildResourceOptions($this->getQueryBuilder(), $parameters);
+
+        return $builder->where($attribute, $operator, $value)->first();
     }
 
     /**
-     * Get query builder
+     * Create the entity and return the created instance
+     * @param Entity $entity
+     * @return Entity|Model
+     */
+    public function create(Entity $entity)
+    {
+        $entity->save();
+        return $this->getQueryBuilder()->find($entity->getAttribute('id'));
+    }
+
+    /**
+     * Update the entity and return the updated instance
+     * @param Entity $entity
+     * @return Entity
+     */
+    public function update(Entity $entity)
+    {
+        $entity->save();
+        return $entity;
+    }
+
+    /**
+     * @param Entity $entity
+     * @return Entity|Model
+     * @throws \Exception
+     */
+    public function delete(Entity $entity)
+    {
+        $entity->delete();
+
+        return $entity;
+    }
+
+    /**
+     * Get query builder instance
      * @return Builder
      */
     public function getQueryBuilder()

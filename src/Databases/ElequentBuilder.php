@@ -3,6 +3,7 @@
 namespace DeveoDK\Core\Manager\Databases;
 
 use Carbon\Carbon;
+use DeveoDK\Core\Manager\Parsers\RequestParameters;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,9 @@ class ElequentBuilder
     /** @var DatabaseManager */
     protected $databaseManager;
 
+    /**
+     * ElequentBuilder constructor.
+     */
     public function __construct()
     {
         $this->cache = app(CacheRepository::class);
@@ -32,48 +36,46 @@ class ElequentBuilder
 
     /**
      * @param Builder $queryBuilder
-     * @param array $options
+     * @param RequestParameters $parameters
      * @return Builder
      */
-    public function buildResourceOptions(Builder $queryBuilder, array $options = [])
+    public function buildResourceOptions(Builder $queryBuilder, RequestParameters $parameters)
     {
         $this->queryBuilder = $queryBuilder;
 
-        // Set includes default value
-        $includes = null;
-
-        // Extract array into variables
-        extract($options);
-
-        if (isset($includes)) {
-            $this->parseIncludes($includes);
+        if (!is_null($parameters->getIncludes())) {
+            $this->parseIncludes($parameters->getIncludes());
         }
 
-        if (isset($sort)) {
-            $this->parseSort($sort);
+        if (!is_null($parameters->getSorts())) {
+            $this->parseSort($parameters->getSorts());
         }
 
-        if (isset($limit)) {
-            $this->parseLimit($limit);
+        if (!is_null($parameters->getLimit())) {
+            $this->parseLimit($parameters->getLimit());
         }
 
-        if (isset($fields)) {
-            $this->parseFields($fields, $includes);
+        if (!is_null($parameters->getFields())) {
+            $this->parseFields($parameters->getFields(), $parameters->getIncludes());
         }
 
-        if (isset($filters)) {
-            $this->parseFilters($filters);
+        if (!is_null($parameters->getFilters())) {
+            $this->parseFilters($parameters->getFilters());
         }
 
         return $this->getQueryBuilder();
     }
 
     /**
-     * @param array $includes
+     * @param array|null $includes
      * @return void
      */
-    protected function parseIncludes(array $includes)
+    protected function parseIncludes(?array $includes)
     {
+        if (is_null($includes)) {
+            return null;
+        }
+
         $model = $this->getQueryBuilder()->getModel();
 
         $included = [];
@@ -91,12 +93,16 @@ class ElequentBuilder
      * @param array $sort
      * @return Builder
      */
-    protected function parseSort(array $sort)
+    protected function parseSort(?array $sort)
     {
         $model = $this->getQueryBuilder()->getModel();
         $queryBuilder = $this->getQueryBuilder();
 
         $joined = [];
+
+        if (is_null($sort)) {
+            return $queryBuilder;
+        }
 
         foreach ($sort as $sorting) {
             $table = ($sorting['table']) ? $sorting['table'] : $model->getTable();
@@ -209,6 +215,7 @@ class ElequentBuilder
             $field = $filter['field'];
             $operator = $filter['operator'];
             $value = $filter['value'];
+            $or = $filter['or'];
 
             $columns = $this->getDatabaseColumns($tableName);
 
@@ -219,37 +226,37 @@ class ElequentBuilder
             $whereOperators = ['=', '!=', '<', '>', '>=', '<=', '<>', 'like'];
 
             if (in_array($operator, $whereOperators)) {
-                $queryBuilder->where($field, $operator, $value);
+                $queryBuilder->where($field, $operator, $value, $or);
                 continue;
             }
 
             switch ($operator) {
                 case 'between':
-                    $queryBuilder->whereBetween($field, $value);
+                    $queryBuilder->whereBetween($field, $value, $or);
                     break;
                 case 'not_between':
-                    $queryBuilder->whereNotBetween($field, $value);
+                    $queryBuilder->whereNotBetween($field, $value, $or);
                     break;
                 case 'in':
-                    $queryBuilder->whereIn($field, $value);
+                    $queryBuilder->whereIn($field, $value, $or);
                     break;
                 case 'not_in':
-                    $queryBuilder->whereNotIn($field, $value);
+                    $queryBuilder->whereNotIn($field, $value, $or);
                     break;
                 case 'month':
-                    $queryBuilder->whereMonth($field, $value);
+                    $queryBuilder->whereMonth($field, '=', $value, $or);
                     break;
                 case 'day':
-                    $queryBuilder->whereDay($field, $value);
+                    $queryBuilder->whereDay($field, '=', $value, $or);
                     break;
                 case 'date':
-                    $queryBuilder->whereDate($field, $value);
+                    $queryBuilder->whereDate($field, '=', $value, $or);
                     break;
                 case 'year':
-                    $queryBuilder->whereYear($field, $value);
+                    $queryBuilder->whereYear($field, '=', $value, $or);
                     break;
                 case 'time':
-                    $queryBuilder->whereTime($field, '=', $value);
+                    $queryBuilder->whereTime($field, '=', $value, $or);
                     break;
             }
         }
@@ -274,10 +281,14 @@ class ElequentBuilder
     }
 
     /**
-     * @param int $limit
+     * @param int|null $limit
      */
-    protected function parseLimit(int $limit)
+    protected function parseLimit(?int $limit)
     {
+        if (is_null($limit)) {
+            return;
+        }
+
         $this->getQueryBuilder()->limit($limit);
     }
 

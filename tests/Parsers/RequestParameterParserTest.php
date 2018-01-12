@@ -2,6 +2,7 @@
 
 namespace DeveoDK\Tests\Parsers;
 
+use DeveoDK\Core\Manager\Parsers\RequestParameterParser;
 use Illuminate\Http\Request;
 use Orchestra\Testbench\TestCase;
 
@@ -12,7 +13,6 @@ class RequestParameterParserTest extends TestCase
      */
     public function setUp()
     {
-        require_once('DummyRequestParameterParser.php');
         parent::setUp();
     }
 
@@ -30,9 +30,9 @@ class RequestParameterParserTest extends TestCase
         $request = (new Request())->merge(['includes' => 'test,test']);
         $requestParameterParser = $this->getParameterParser($request);
 
-        $outputArray = $requestParameterParser->parseResourceOptions();
+        $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($includesArray, $outputArray['includes']);
+        $this->assertEquals($includesArray, $output->getIncludes());
     }
 
     /**
@@ -49,9 +49,9 @@ class RequestParameterParserTest extends TestCase
         $request = (new Request())->merge(['includes' => 'test,  test']);
         $requestParameterParser = $this->getParameterParser($request);
 
-        $outputArray = $requestParameterParser->parseResourceOptions();
+        $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($includesArray, $outputArray['includes']);
+        $this->assertEquals($includesArray, $output->getIncludes());
     }
 
     /**
@@ -68,9 +68,9 @@ class RequestParameterParserTest extends TestCase
         $request = (new Request())->merge(['includes' => 'test,test,']);
         $requestParameterParser = $this->getParameterParser($request);
 
-        $outputArray = $requestParameterParser->parseResourceOptions();
+        $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($includesArray, $outputArray['includes']);
+        $this->assertEquals($includesArray, $output->getIncludes());
     }
 
     /**
@@ -87,9 +87,9 @@ class RequestParameterParserTest extends TestCase
         $request = (new Request())->merge(['includes' => 'awesome_test,test,']);
         $requestParameterParser = $this->getParameterParser($request);
 
-        $outputArray = $requestParameterParser->parseResourceOptions();
+        $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($includesArray, $outputArray['includes']);
+        $this->assertEquals($includesArray, $output->getIncludes());
     }
 
     /**
@@ -107,9 +107,9 @@ class RequestParameterParserTest extends TestCase
         $request = (new Request())->merge(['includes' => 'test,dummy']);
         $requestParameterParser = $this->getParameterParser($request);
 
-        $outputArray = $requestParameterParser->parseResourceOptions();
+        $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($includesArray, $outputArray['includes']);
+        $this->assertEquals($includesArray, $output->getIncludes());
     }
 
     /**
@@ -123,7 +123,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals(10, $output['limit']);
+        $this->assertEquals(10, $output->getLimit());
     }
 
     /**
@@ -137,7 +137,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals(10, $output['limit']);
+        $this->assertEquals(10, $output->getLimit());
     }
 
     /**
@@ -151,7 +151,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals(10, $output['limit']);
+        $this->assertEquals(10, $output->getLimit());
     }
 
     /**
@@ -165,7 +165,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals(10, $output['page']);
+        $this->assertEquals(10, $output->getPage());
     }
 
     /**
@@ -179,7 +179,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals(10, $output['page']);
+        $this->assertEquals(10, $output->getPage());
     }
 
     /**
@@ -193,7 +193,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals(10, $output['page']);
+        $this->assertEquals(10, $output->getPage());
     }
 
     /**
@@ -213,7 +213,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($fieldsArray, $output['fields']);
+        $this->assertEquals($fieldsArray, $output->getFields());
     }
 
     /**
@@ -233,7 +233,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($fieldsArray, $output['fields']);
+        $this->assertEquals($fieldsArray, $output->getFields());
     }
 
     /**
@@ -255,7 +255,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($fieldsArray, $output['fields']);
+        $this->assertEquals($fieldsArray, $output->getFields());
     }
 
     /**
@@ -268,12 +268,14 @@ class RequestParameterParserTest extends TestCase
             [
                 'field' => 'active',
                 'operator' => '=',
-                'value' => 'super'
+                'value' => 'super',
+                'or' => 'and'
             ],
             [
                 'field' => 'super',
                 'operator' => '=',
-                'value' => true
+                'value' => true,
+                'or' => 'and'
             ]
         ];
 
@@ -282,7 +284,36 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($fieldsArray, $output['filters']);
+        $this->assertEquals($fieldsArray, $output->getFilters());
+    }
+
+    /**
+     * can parse filters
+     * @test
+     */
+    public function canParseFiltersOr()
+    {
+        $fieldsArray = [
+            [
+                'field' => 'active',
+                'operator' => '=',
+                'value' => 'super',
+                'or' => 'and'
+            ],
+            [
+                'field' => 'super',
+                'operator' => '=',
+                'value' => true,
+                'or' => 'and'
+            ]
+        ];
+
+        $request = (new Request())->merge(['filters' => 'active:=:super,super:=:true']);
+        $requestParameterParser = $this->getParameterParser($request);
+
+        $output = $requestParameterParser->parseResourceOptions();
+
+        $this->assertEquals($fieldsArray, $output->getFilters());
     }
 
     /**
@@ -299,7 +330,8 @@ class RequestParameterParserTest extends TestCase
                     'super',
                     'mega',
                     'awesome'
-                ]
+                ],
+                'or' => 'and'
             ]
         ];
 
@@ -308,7 +340,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($filtersArray, $output['filters']);
+        $this->assertEquals($filtersArray, $output->getFilters());
     }
 
     /**
@@ -322,7 +354,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals(true, $output['filters'][0]['value']);
+        $this->assertEquals(true, $output->getFilters()[0]['value']);
     }
 
     /**
@@ -344,7 +376,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($sortsArray, $output['sorts']);
+        $this->assertEquals($sortsArray, $output->getSorts());
     }
 
     /**
@@ -366,7 +398,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals($sortsArray, $output['sorts']);
+        $this->assertEquals($sortsArray, $output->getSorts());
     }
 
     /**
@@ -380,7 +412,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals('json', $output['format']);
+        $this->assertEquals('json', $output->getFormat());
     }
 
     /**
@@ -394,7 +426,7 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals('xml', $output['format']);
+        $this->assertEquals('xml', $output->getFormat());
     }
 
     /**
@@ -408,15 +440,15 @@ class RequestParameterParserTest extends TestCase
 
         $output = $requestParameterParser->parseResourceOptions();
 
-        $this->assertEquals('yaml', $output['format']);
+        $this->assertEquals('yaml', $output->getFormat());
     }
 
     /**
      * @param Request $request
-     * @return DummyRequestParameterParser
+     * @return RequestParameterParser
      */
     protected function getParameterParser(Request $request)
     {
-        return new DummyRequestParameterParser($request);
+        return new RequestParameterParser($request, ['dummy' => 'super'], ['dummy' => 'super']);
     }
 }

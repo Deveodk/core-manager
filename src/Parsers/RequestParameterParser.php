@@ -4,51 +4,66 @@ namespace DeveoDK\Core\Manager\Parsers;
 
 use Illuminate\Http\Request;
 
-trait RequestParameterParser
+class RequestParameterParser
 {
-    /** @var array */
-    protected $defaults = [];
-
-    /** @var array */
-    protected $options = [];
-
     /** @var Request */
     protected $request;
+
+    /** @var array */
+    protected $fieldAliases = [];
+
+    /** @var array */
+    protected $includesAlias = [];
+
+    /** @var array */
+    protected $includes;
+
+    /** @var array */
+    protected $sorts;
+
+    /** @var int|null */
+    protected $limit;
+
+    /** @var int|null */
+    protected $page;
+
+    /** @var array */
+    protected $filters;
+
+    /** @var array */
+    protected $fields;
+
+    /** @var string */
+    protected $format;
 
     /**
      * RequestParameterParser constructor.
      * @param Request $request
+     * @param array $fieldAliases
+     * @param array $includesAlias
      */
-    public function __construct(Request $request)
+    public function __construct(Request $request, array $fieldAliases, array $includesAlias)
     {
         $this->request = $request;
+        $this->fieldAliases = $fieldAliases;
+        $this->includesAlias = $includesAlias;
     }
 
     /**
-     * @return array
+     * @return RequestParameters
      */
     public function parseResourceOptions()
     {
         $request = $this->request;
 
-        $this->defaults = array_merge([
-            'includes' => null,
-            'sorts' => null,
-            'limit' => null,
-            'page' => null,
-            'filters' => null,
-            'fields' => null,
-            'format' => null,
-        ], $this->defaults);
-
         $options = [
-            'includes' => $request->get('includes') ? trim($request->get('includes')) : $this->defaults['includes'],
-            'sorts' => $request->get('sorts') ? trim($request->get('sorts')) : $this->defaults['sorts'],
-            'limit' => $request->get('limit') ? trim($request->get('limit')) : $this->defaults['limit'],
-            'page' => $request->get('page') ? trim($request->get('page')) : $this->defaults['page'],
-            'filters' => $request->get('filters') ? trim($request->get('filters')) : $this->defaults['filters'],
-            'fields' => $request->get('fields') ? trim($request->get('fields')) : $this->defaults['fields'],
-            'format' => $request->get('format') ? trim($request->get('format')) : $this->defaults['format'],
+            'includes' => $request->get('includes') ? trim($request->get('includes')) : null,
+            'sorts' => $request->get('sorts') ? trim($request->get('sorts')) : null,
+            'limit' => $request->get('limit') ? trim($request->get('limit')) : null,
+            'page' => $request->get('page') ? trim($request->get('page')) : null,
+            'filters' => $request->get('filters') ? trim($request->get('filters')) : null,
+            'fields' => $request->get('fields') ? trim($request->get('fields')) : null,
+            'format' => $request->get('format') ? trim($request->get('format')) : null,
         ];
 
         $includes = $this->parseIncludes($options['includes']);
@@ -65,17 +80,7 @@ trait RequestParameterParser
 
         $filters = $this->parseFilters($options['filters']);
 
-        $this->options = [
-            'includes' => $includes,
-            'sorts' => $sorts,
-            'limit' => $limit,
-            'page' => $page,
-            'fields' => $fields,
-            'format' => $format,
-            'filters' => $filters,
-        ];
-
-        return $this->options;
+        return new RequestParameters($includes, $sorts, $limit, $page, $filters, $fields, $format);
     }
 
     /**
@@ -241,13 +246,10 @@ trait RequestParameterParser
                 continue;
             }
 
-            if (count($rawArray) !== 3) {
-                continue;
-            }
-
             $field = trim($rawArray[0]);
             $operator = trim($rawArray[1]);
-            $value = trim($rawArray[2]);
+            $value = trim(str_replace(';', ':', $rawArray[2]));
+            $or = isset($rawArray[3]) ? 'or' : 'and';
 
             // If array of values given
             if (str_contains($value, '|')) {
@@ -266,7 +268,8 @@ trait RequestParameterParser
             array_push($filtersArray, [
                 'field' => $field,
                 'operator' => $operator,
-                'value' => $value
+                'value' => $value,
+                'or' => $or
             ]);
         }
 
@@ -279,17 +282,6 @@ trait RequestParameterParser
      */
     protected function parseFormat($format)
     {
-        switch (mb_strtolower($format)) {
-            case 'xml':
-                return 'xml';
-            case 'json':
-                return 'json';
-            case 'yaml':
-                return 'yaml';
-            case 'yml':
-                return 'yaml';
-            default:
-                return 'json';
-        }
+        return mb_strtolower($format);
     }
 }
