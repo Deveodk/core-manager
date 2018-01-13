@@ -451,4 +451,16 @@ class RequestParameterParserTest extends TestCase
     {
         return new RequestParameterParser($request, ['dummy' => 'super'], ['dummy' => 'super']);
     }
+
+    /**
+     * Define environment setup.
+     *
+     * @param  \Illuminate\Foundation\Application  $app
+     *
+     * @return void
+     */
+    protected function getEnvironmentSetUp($app)
+    {
+        $app['config']->set('core.manager.max_limit', 100);
+    }
 }

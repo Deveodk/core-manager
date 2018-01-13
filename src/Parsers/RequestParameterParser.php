@@ -168,11 +168,13 @@ class RequestParameterParser
      */
     protected function parseLimit($limit)
     {
+        $maxLimit = config('core.manager.max_limit');
+
         if (is_null($limit)) {
-            return null;
+            return (int) $maxLimit;
         }
 
-        return (int) $limit;
+        return (int) ($maxLimit >= $limit) ? $limit : $maxLimit;
     }
 
     /**

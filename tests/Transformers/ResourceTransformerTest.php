@@ -74,5 +74,6 @@ class ResourceTransformerTest extends TestCase
     {
         $app['config']->set('core.manager.wrap', 'data');
         $app['config']->set('core.manager.includes_wrap', false);
+        $app['config']->set('core.manager.max_limit', 100);
     }
 }

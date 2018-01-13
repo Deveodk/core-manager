@@ -11,4 +11,7 @@ return [
 
     // Should includes be wrapped?
     'includes_wrap' => false,
+
+    // Max limit of elements that can be fetched at once
+    'max_limit' => 100
 ];
