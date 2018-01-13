@@ -81,8 +81,20 @@ class ElequentBuilder
         $included = [];
 
         foreach ($includes as $include) {
-            if (method_exists($model, $include)) {
-                array_push($included, $include);
+            $include = explode('.', $include);
+            $baseInclude = (isset($include[0])) ? $include[0] : null;
+
+            if (method_exists($model, $baseInclude)) {
+                $relationModel = $model->{$baseInclude}()->getModel();
+
+                $relationInclude = (isset($include[1])) ? $include[1] : null;
+
+                if (method_exists($relationModel, $relationInclude)) {
+                    array_push($included, implode('.', $include));
+                    continue;
+                }
+
+                array_push($included, $baseInclude);
             }
         }
 
