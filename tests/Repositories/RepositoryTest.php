@@ -65,7 +65,7 @@ class RepositoryTest extends TestCase
     {
         $repository = new DummyRepository();
 
-        $result = $repository->findBy(new RequestParameters(), 'created_at', '=', Carbon::now());
+        $result = $repository->findBy(new RequestParameters(), 'id', '=', 1);
 
         $this->assertEquals(1, $result->getAttribute('id'));
     }
@@ -78,9 +78,9 @@ class RepositoryTest extends TestCase
     {
         $repository = new DummyRepository();
 
-        $result = $repository->findAllWhere(new RequestParameters(), 'created_at', Carbon::now());
+        $result = $repository->findAllWhere(new RequestParameters(), 'id', 1);
 
-        $this->assertEquals(100, count($result));
+        $this->assertEquals(1, count($result));
     }
 
     /**
