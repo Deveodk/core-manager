@@ -97,6 +97,33 @@ class DummyEntity extends Entity
 
 ```
 
+#### Custom filters
+
+To create a custom filter simply create a method with ``` customFilter```appended to the start.
+When the custom filter is created it can be queried through the regular syntax.
+
+```php
+public function customFilterPopular($builder, string $operator, string $value, bool $or)
+{
+    /** @var Builder $builder */
+    $builder->where('id', $operator, $value);
+}
+```
+
+#### Custom sort
+
+To create a custom sort simply create a method with ``` customSort```appended to the start.
+When the custom sort is created it can be queried through the regular syntax.
+
+```php
+public function customSortPopular($builder, string $direction, string $table)
+{
+    /** @var Builder $builder */
+    $builder->orderBy('id', $direction);
+}
+```
+
+
 ## Repositories
 
 #### Using repository
