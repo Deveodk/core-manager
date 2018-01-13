@@ -41,6 +41,7 @@ class ResourceTransformerTest extends TestCase
     /**
      * Can transform array to response
      * @test
+     * @throws \DeveoDK\Core\Manager\Exceptions\FormatterDoNotImplementInterface
      */
     public function canTransformArrayToResponse()
     {
@@ -60,5 +61,18 @@ class ResourceTransformerTest extends TestCase
         $decoded = json_decode($transformed->getContent());
 
         $this->assertEquals(2, count($decoded->data));
+    }
+
+    /**
+     * Define environment setup.
+     *
+     * @param  \Illuminate\Foundation\Application  $app
+     *
+     * @return void
+     */
+    protected function getEnvironmentSetUp($app)
+    {
+        $app['config']->set('core.manager.wrap', 'data');
+        $app['config']->set('core.manager.includes_wrap', false);
     }
 }

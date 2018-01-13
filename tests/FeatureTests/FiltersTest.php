@@ -530,5 +530,7 @@ class FiltersTest extends TestCase
             'database' => ':memory:',
             'prefix'   => '',
         ]);
+        $app['config']->set('core.manager.wrap', 'data');
+        $app['config']->set('core.manager.includes_wrap', false);
     }
 }

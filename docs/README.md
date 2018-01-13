@@ -45,6 +45,11 @@ Core manager contains a config file placed under ```config -> core -> manger```
 
 to replace the default formatter simple replace the ``` formatter ``` value with an formatter that implements ``` FormatterInterface ```
 
+You can also configure if the transformed data should be wrapped, the following config keys can be set.
+
+* ``` wrap ``` default is ``` data ```
+* ``` includes_wrap ``` default is ``` false ```
+
 ## Implementation
 
 Its prette easy implenting the core manager. Simply do as following.

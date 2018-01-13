@@ -18,6 +18,13 @@
         "orchestra/testbench": "^3.5",
         "fzaninotto/faker": "^1.7"
     },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "DeveoDK\\Core\\Manager\\ManagerServiceProvider"
+            ]
+        }
+    },
     "minimum-stability": "dev",
     "prefer-stable": true,
     "license": "MIT"

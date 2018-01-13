@@ -38,10 +38,10 @@ abstract class ResourceTransformer
     protected $requestParameters;
 
     /** @var string */
-    protected $wrap = 'data';
+    protected $wrap;
 
     /** @var array */
-    private $meta = [];
+    private $meta = ['meta' => []];
 
     /** @var array */
     private $extra = [];
@@ -56,6 +56,10 @@ abstract class ResourceTransformer
 
         if ($request) {
             $this->request = $request;
+        }
+
+        if (!$this->wrap) {
+            $this->wrap = config('core.manager.wrap');
         }
 
         $this->mergeExtra();
@@ -80,9 +84,10 @@ abstract class ResourceTransformer
 
     /**
      * @param $data
+     * @param bool $wrap
      * @return array
      */
-    public function transform($data)
+    public function transform($data, bool $wrap = true)
     {
         if (is_null($data)) {
             return [];
@@ -109,9 +114,11 @@ abstract class ResourceTransformer
 
             $data = $this->filter($transformed);
 
-            $wrapped = $this->wrap($data);
+            if ($wrap) {
+                $data = $this->wrap($data);
+            }
 
-            return $this->mergeMetaAndExtra($wrapped);
+            return $this->mergeMetaAndExtra($data);
         }
 
         // Save in temp var for relations
@@ -120,9 +127,11 @@ abstract class ResourceTransformer
 
         $data = $this->filter($array);
 
-        $wrapped = $this->wrap($data);
+        if ($wrap) {
+            $data = $this->wrap($data);
+        }
 
-        return $this->mergeMetaAndExtra($wrapped);
+        return $this->mergeMetaAndExtra($data);
     }
 
     /**
@@ -167,7 +176,9 @@ abstract class ResourceTransformer
      */
     private function mergeMetaAndExtra(array $data)
     {
-        return array_merge_recursive($data, $this->meta, $this->extra);
+        $meta = (empty($this->meta['meta'])) ? [] : $this->meta;
+
+        return array_merge_recursive($data, $meta, $this->extra);
     }
 
     /**
@@ -250,7 +261,7 @@ abstract class ResourceTransformer
         /** @var ResourceTransformer $resourceTransformer */
         $resourceTransformer = new $transformer;
 
-        $transformed = $resourceTransformer->transform($data);
+        $transformed = $resourceTransformer->transform($data, config('core.manager.includes_wrap'));
 
         return new Relation($transformed);
     }
@@ -340,6 +351,10 @@ abstract class ResourceTransformer
         }
 
         if (is_null($this->wrap)) {
+            return $data;
+        }
+
+        if ($this->wrap === '') {
             return $data;
         }
 
