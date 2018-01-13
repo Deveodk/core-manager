@@ -205,10 +205,12 @@ class RepositoryTest extends TestCase
     {
         $this->databaseManager->table('users')->delete();
 
+        $users = [];
+
         for ($i = 0; $i < 100; $i++) {
             $faker = Factory::create();
 
-            $this->databaseManager->table('users')->insert([
+            array_push($users, [
                 'name' => $faker->name,
                 'email' => $faker->unique()->email,
                 'password' => $faker->password,
@@ -216,6 +218,8 @@ class RepositoryTest extends TestCase
                 'updated_at' => Carbon::now(),
             ]);
         }
+
+        $this->databaseManager->table('users')->insert($users);
     }
 
     /**
