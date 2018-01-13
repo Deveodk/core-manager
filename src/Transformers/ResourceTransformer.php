@@ -2,25 +2,26 @@
 
 namespace DeveoDK\Core\Manager\Transformers;
 
+use DeveoDK\Core\Manager\Databases\Entity;
+use DeveoDK\Core\Manager\Exceptions\FormatterDoNotImplementInterface;
+use DeveoDK\Core\Manager\Formatters\Formatter;
+use DeveoDK\Core\Manager\Formatters\FormatterInterface;
+use DeveoDK\Core\Manager\Paginators\Paginator;
 use DeveoDK\Core\Manager\Parsers\RequestParameterParser;
+use DeveoDK\Core\Manager\Parsers\RequestParameters;
 use DeveoDK\Core\Manager\Resources\EmptyRelation;
+use DeveoDK\Core\Manager\Resources\MergeValue;
+use DeveoDK\Core\Manager\Resources\MissingValue;
 use DeveoDK\Core\Manager\Resources\Relation;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\MergeValue;
-use Illuminate\Http\Resources\MissingValue;
 use Illuminate\Http\Response;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 abstract class ResourceTransformer
 {
-    // Parse options from request
-    use RequestParameterParser, RelationsTransformer;
-
-    /** @var Formatter */
-    protected $formatter;
-
     /** @var Request */
     protected $request;
 
@@ -31,36 +32,76 @@ abstract class ResourceTransformer
     protected $includesAlias = [];
 
     /** @var array */
-    protected $options = [];
+    protected $data = [];
+
+    /** @var RequestParameters */
+    protected $requestParameters;
+
+    /** @var string */
+    protected $wrap;
 
     /** @var array */
-    protected $data = [];
+    private $meta = ['meta' => []];
+
+    /** @var array */
+    private $extra = [];
 
     /**
      * ResourceTransformer constructor.
-     * @param null $options
+     * @param Request|null $request
      */
-    public function __construct($options = null)
+    public function __construct(?Request $request = null)
     {
-        $this->formatter = app(Formatter::class);
-        $this->request = app(Request::class);
-        $this->options = $options;
+        $this->request = new Request();
+
+        if ($request) {
+            $this->request = $request;
+        }
+
+        if (!$this->wrap) {
+            $this->wrap = config('core.manager.wrap');
+        }
+
+        $this->mergeExtra();
+        $this->mergeMeta();
+    }
+
+    /**
+     * Parse resource options
+     *
+     * @return RequestParameters
+     */
+    public function parseResourceOptions()
+    {
+        $requestParameterParser = new RequestParameterParser(
+            $this->request,
+            $this->fieldAliases,
+            $this->includesAlias
+        );
+
+        return $this->requestParameters = $requestParameterParser->parseResourceOptions();
     }
 
     /**
      * @param $data
+     * @param bool $wrap
      * @return array
      */
-    public function transform($data)
+    public function transform($data, bool $wrap = true)
     {
-        $this->formatter->setMeta($this->getMeta());
-        $this->formatter->setWith($this->getExtra());
-
-        if ($data instanceof LengthAwarePaginator) {
-            $this->withPaginator($data);
+        if (is_null($data)) {
+            return [];
         }
 
-        if ($data instanceof Collection || $data instanceof LengthAwarePaginator) {
+        if ($data instanceof LengthAwarePaginator) {
+            $paginator = new Paginator($this->request);
+            $paginator->formatPaginator($data);
+
+            $this->meta['meta'] = array_merge($this->meta['meta'], $paginator->getMeta());
+            $this->extra = array_merge($this->extra, $paginator->getLinks());
+        }
+
+        if ($data instanceof Collection || $data instanceof LengthAwarePaginator || is_array($data)) {
             $transformed = [];
 
             foreach ($data as $transformable) {
@@ -71,24 +112,33 @@ abstract class ResourceTransformer
                 array_push($transformed, $array);
             }
 
-            return $this->filter($transformed);
-        }
+            $data = $this->filter($transformed);
 
-        if (is_null($data)) {
-            return [];
+            if ($wrap) {
+                $data = $this->wrap($data);
+            }
+
+            return $this->mergeMetaAndExtra($data);
         }
 
         // Save in temp var for relations
         $this->data = $data;
         $array = $this->resourceData($data);
 
-        return $this->filter($array);
+        $data = $this->filter($array);
+
+        if ($wrap) {
+            $data = $this->wrap($data);
+        }
+
+        return $this->mergeMetaAndExtra($data);
     }
 
     /**
      * @param $data
      * @param int $status
      * @return JsonResponse|Response
+     * @throws FormatterDoNotImplementInterface
      */
     public function transformToResponse($data, int $status = 200)
     {
@@ -96,82 +146,48 @@ abstract class ResourceTransformer
     }
 
     /**
-     * @param LengthAwarePaginator $lengthAwarePaginator
-     */
-    protected function withPaginator(LengthAwarePaginator $lengthAwarePaginator)
-    {
-        $paginator = $lengthAwarePaginator->toArray();
-
-        $meta = [
-            'current_page' => $paginator['current_page'],
-            'from' => $paginator['from'],
-            'last_page' => $paginator['last_page'],
-            'path' => $paginator['path'],
-            'per_page' => (int) $paginator['per_page'],
-            'to' => $paginator['to'],
-            'total' => $paginator['total']
-        ];
-        $links = [
-            'links' => [
-                'first' => $this->getCorrectPaginatorLink($paginator['first_page_url']),
-                'last' => $this->getCorrectPaginatorLink($paginator['last_page_url']),
-                'prev' => $this->getCorrectPaginatorLink($paginator['prev_page_url']),
-                'next' => $this->getCorrectPaginatorLink($paginator['next_page_url'])
-            ],
-        ];
-
-        $this->formatter->setMeta($meta);
-        $this->formatter->setWith($links);
-    }
-
-    /**
-     * @param $url
-     * @return string
-     */
-    protected function getCorrectPaginatorLink($url)
-    {
-        if (is_null($url)) {
-            return $url;
-        }
-
-        $rawQueryString = $this->request->query();
-        unset($rawQueryString['page']);
-
-        $queryString = http_build_query($rawQueryString);
-
-        return sprintf('%s&%s', $url, $queryString);
-    }
-
-    /**
      * @param $data
      * @param int $status
      * @return JsonResponse|Response
+     * @throws FormatterDoNotImplementInterface
      */
-    protected function toResponse($data, $status = 200)
+    private function toResponse($data, $status = 200)
     {
-        $formatter = $this->formatter;
+        $config = config('core.manager');
 
-        switch ($this->getOptions()['format']) {
-            case 'xml':
-                return $formatter->toXML($data, $status);
-            case 'yaml':
-                return $formatter->toYaml($data, $status);
-            case 'yml':
-                return $formatter->toYaml($data, $status);
-            case 'json':
-                return $formatter->toJson($data, $status);
-            default:
-                return $formatter->toJson($data, $status);
+        /** @var FormatterInterface $formatter */
+        $formatter = isset($config['formatter']) ? $config['formatter'] : Formatter::class;
+
+        $formattersInterface = class_implements($formatter);
+
+        if (!isset($formattersInterface[FormatterInterface::class])) {
+            throw new FormatterDoNotImplementInterface();
         }
+
+        $formatter = new $formatter;
+        $format = $this->getRequestParameters()->getFormat();
+
+        return $formatter->toResponse($data, $status, $format);
+    }
+
+    /**
+     * @param array $data
+     * @return array
+     */
+    private function mergeMetaAndExtra(array $data)
+    {
+        $meta = (empty($this->meta['meta'])) ? [] : $this->meta;
+
+        return array_merge_recursive($data, $meta, $this->extra);
     }
 
     /**
      * @param $array
      * @return array
      */
-    protected function filter($array)
+    private function filter($array)
     {
-        $fieldsSelected = isset($this->getOptions()['fields']) ? $this->getOptions()['fields'] : null;
+        $fieldsSelected = $this->getRequestParameters()->getFields();
 
         foreach ($array as $key => $value) {
             // Call recurse if array and combine the keys
@@ -191,7 +207,7 @@ abstract class ResourceTransformer
             }
 
             if ($value instanceof MergeValue) {
-                $mergeData = $value->data;
+                $mergeData = $value->getData();
                 $mergeData = $this->filter($mergeData);
 
                 foreach ($mergeData as $index => $data) {
@@ -217,27 +233,70 @@ abstract class ResourceTransformer
     }
 
     /**
-     * @return array
+     * @param string $relationName
+     * @param string $transformer
+     * @return mixed|null
      */
-    public function getExtra()
+    protected function includes($relationName, $transformer)
     {
-        if (method_exists($this, 'extra')) {
-            return $this->extra();
+        /** @var Model $model */
+        $model = $this->data;
+
+        // When relation does not exist
+        if (!$this->relationExist($model, $relationName)) {
+            return new MissingValue();
         }
 
-        return [];
+        $data = $model->{$relationName};
+
+        if (is_null($data)) {
+            return new EmptyRelation();
+        }
+
+        // If relation is empty
+        if (empty($data) === 0) {
+            return new EmptyRelation();
+        }
+
+        /** @var ResourceTransformer $resourceTransformer */
+        $resourceTransformer = new $transformer;
+
+        $transformed = $resourceTransformer->transform($data, config('core.manager.includes_wrap'));
+
+        return new Relation($transformed);
     }
 
     /**
-     * @return array
+     * Determine if the relation exist on this instance
+     * @param Model|Entity $model
+     * @param string $relationName
+     * @return bool
      */
-    public function getMeta()
+    private function relationExist($model, $relationName)
+    {
+        return array_key_exists($relationName, $model->getRelations());
+    }
+
+    /**
+     * Merge extra into array
+     * @return void
+     */
+    private function mergeExtra()
+    {
+        if (method_exists($this, 'extra')) {
+            $this->extra = $this->extra();
+        }
+    }
+
+    /**
+     * Merge meta data
+     * @return void
+     */
+    private function mergeMeta()
     {
         if (method_exists($this, 'meta')) {
-            return $this->meta();
+            $this->meta['meta'] = $this->meta();
         }
-
-        return [];
     }
 
     /**
@@ -245,7 +304,7 @@ abstract class ResourceTransformer
      *
      * @param  bool  $condition
      * @param  mixed  $value
-     * @return \Illuminate\Http\Resources\MissingValue|mixed
+     * @return MissingValue|mixed
      */
     protected function mergeWhen($condition, $value)
     {
@@ -270,10 +329,35 @@ abstract class ResourceTransformer
     }
 
     /**
+     * @return RequestParameters
+     */
+    private function getRequestParameters()
+    {
+        if ($this->requestParameters) {
+            return $this->requestParameters;
+        }
+
+        return $this->requestParameters = new RequestParameters();
+    }
+
+    /**
+     * @param array $data
      * @return array
      */
-    public function getOptions()
+    private function wrap(array $data)
     {
-        return $this->options;
+        if ($data instanceof Collection) {
+            $data = $data->all();
+        }
+
+        if (is_null($this->wrap)) {
+            return $data;
+        }
+
+        if ($this->wrap === '') {
+            return $data;
+        }
+
+        return [$this->wrap => $data];
     }
 }

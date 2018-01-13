@@ -4,56 +4,71 @@ namespace DeveoDK\Core\Manager\Parsers;
 
 use Illuminate\Http\Request;
 
-trait RequestParameterParser
+class RequestParameterParser
 {
-    /** @var array */
-    protected $defaults = [];
-
-    /** @var array */
-    protected $options = [];
-
     /** @var Request */
     protected $request;
+
+    /** @var array */
+    protected $fieldAliases = [];
+
+    /** @var array */
+    protected $includesAlias = [];
+
+    /** @var array */
+    protected $includes;
+
+    /** @var array */
+    protected $sorts;
+
+    /** @var int|null */
+    protected $limit;
+
+    /** @var int|null */
+    protected $page;
+
+    /** @var array */
+    protected $filters;
+
+    /** @var array */
+    protected $fields;
+
+    /** @var string */
+    protected $format;
 
     /**
      * RequestParameterParser constructor.
      * @param Request $request
+     * @param array $fieldAliases
+     * @param array $includesAlias
      */
-    public function __construct(Request $request)
+    public function __construct(Request $request, array $fieldAliases, array $includesAlias)
     {
         $this->request = $request;
+        $this->fieldAliases = $fieldAliases;
+        $this->includesAlias = $includesAlias;
     }
 
     /**
-     * @return array
+     * @return RequestParameters
      */
     public function parseResourceOptions()
     {
         $request = $this->request;
 
-        $this->defaults = array_merge([
-            'includes' => null,
-            'sort' => null,
-            'limit' => null,
-            'page' => null,
-            'filters' => null,
-            'fields' => null,
-            'format' => null,
-        ], $this->defaults);
-
         $options = [
-            'includes' => $request->get('includes') ? trim($request->get('includes')) : $this->defaults['includes'],
-            'sort' => $request->get('sort') ? trim($request->get('sort')) : $this->defaults['sort'],
-            'limit' => $request->get('limit') ? trim($request->get('limit')) : $this->defaults['limit'],
-            'page' => $request->get('page') ? trim($request->get('page')) : $this->defaults['page'],
-            'filters' => $request->get('filters') ? trim($request->get('filters')) : $this->defaults['filters'],
-            'fields' => $request->get('fields') ? trim($request->get('fields')) : $this->defaults['fields'],
-            'format' => $request->get('format') ? trim($request->get('format')) : $this->defaults['format'],
+            'includes' => $request->get('includes') ? trim($request->get('includes')) : null,
+            'sorts' => $request->get('sorts') ? trim($request->get('sorts')) : null,
+            'limit' => $request->get('limit') ? trim($request->get('limit')) : null,
+            'page' => $request->get('page') ? trim($request->get('page')) : null,
+            'filters' => $request->get('filters') ? trim($request->get('filters')) : null,
+            'fields' => $request->get('fields') ? trim($request->get('fields')) : null,
+            'format' => $request->get('format') ? trim($request->get('format')) : null,
         ];
 
         $includes = $this->parseIncludes($options['includes']);
 
-        $sort = $this->parseSort($options['sort']);
+        $sorts = $this->parseSorts($options['sorts']);
 
         $limit = $this->parseLimit($options['limit']);
 
@@ -65,19 +80,14 @@ trait RequestParameterParser
 
         $filters = $this->parseFilters($options['filters']);
 
-        $this->options = [
-            'includes' => $includes,
-            'sort' => $sort,
-            'limit' => $limit,
-            'page' => $page,
-            'fields' => $fields,
-            'format' => $format,
-            'filters' => $filters,
-        ];
-
-        return $this->options;
+        return new RequestParameters($includes, $sorts, $limit, $page, $filters, $fields, $format);
     }
 
+    /**
+     * Parse includes into array
+     * @param $includes
+     * @return array|null
+     */
     protected function parseIncludes($includes)
     {
         if (is_null($includes)) {
@@ -89,6 +99,10 @@ trait RequestParameterParser
         $includes = [];
 
         foreach ($rawIncludes as $include) {
+            if (empty($include)) {
+                continue;
+            }
+
             $formattedInclude = camel_case($include);
 
             // If alias of field
@@ -107,49 +121,45 @@ trait RequestParameterParser
      * @param $sort
      * @return array|null
      */
-    protected function parseSort($sort)
+    protected function parseSorts($sort)
     {
         if (is_null($sort)) {
             return null;
         }
 
-        $rawSort = explode(',', $sort);
+        $rawSorts = explode(',', $sort);
 
-        $sortArray = [];
+        $sortsArray = [];
 
-        foreach ($rawSort as $sorting) {
-            $directionParse = explode(':', $sorting);
+        foreach ($rawSorts as $sorting) {
+            $rawSort = explode(':', $sorting);
 
-            $direction = 'asc';
-
-            $tableColumn = $directionParse[0];
-
-            // If direction is not given default to ascending
-            if (count($directionParse) === 2) {
-                $direction = $directionParse[1];
+            if (!isset($rawSort[0])) {
+                continue;
             }
 
-            // If non existing order default to desc
-            $direction = mb_strtolower($direction) === 'asc' ? 'ASC' : 'DESC';
+            $column = $rawSort[0];
+            $direction = 'ASC';
+            $table = null;
 
-            $columnParser = explode('.', $tableColumn);
-
-            if (count($columnParser) === 2) {
-                $table = $columnParser[0];
-                $column = $columnParser[1];
-            } else {
-                $table = null;
-                $column = $columnParser[0];
+            // Direction isset
+            if (isset($rawSort[1])) {
+                $direction = mb_strtolower($rawSort[1]) === 'asc' ? 'ASC' : 'DESC';
             }
 
-            array_push($sortArray, [
+            // Table is set
+            if (isset($rawSort[2])) {
+                $table = mb_strtolower($rawSort[2]);
+            }
+
+            array_push($sortsArray, [
+                'column' => $column,
                 'direction' => $direction,
                 'table' => $table,
-                'column' => $column
             ]);
         }
 
-        return $sortArray;
+        return $sortsArray;
     }
 
     /**
@@ -158,11 +168,13 @@ trait RequestParameterParser
      */
     protected function parseLimit($limit)
     {
+        $maxLimit = config('core.manager.max_limit');
+
         if (is_null($limit)) {
-            return null;
+            return (int) $maxLimit;
         }
 
-        return $limit;
+        return (int) ($maxLimit >= $limit) ? $limit : $maxLimit;
     }
 
     /**
@@ -175,7 +187,7 @@ trait RequestParameterParser
             return null;
         }
 
-        return $page;
+        return (int) $page;
     }
 
     /**
@@ -194,6 +206,10 @@ trait RequestParameterParser
         $fields = [];
 
         foreach ($rawFields as $field) {
+            if (empty($field)) {
+                continue;
+            }
+
             // If alias of field
             if (key_exists($field, $this->fieldAliases)) {
                 array_push($fields, $this->fieldAliases[$field]);
@@ -232,15 +248,17 @@ trait RequestParameterParser
                 continue;
             }
 
-            if (count($rawArray) !== 3) {
-                continue;
-            }
-
             $field = trim($rawArray[0]);
             $operator = trim($rawArray[1]);
-            $value = trim($rawArray[2]);
+            $value = trim(str_replace(';', ':', $rawArray[2]));
+            $or = isset($rawArray[3]) ? 'or' : 'and';
 
-            // Handle boolean values
+            // If array of values given
+            if (str_contains($value, '|')) {
+                $value = explode('|', $value);
+            }
+
+            // Handle bool values
             if ($value === 'true') {
                 $value = true;
             }
@@ -252,7 +270,8 @@ trait RequestParameterParser
             array_push($filtersArray, [
                 'field' => $field,
                 'operator' => $operator,
-                'value' => $value
+                'value' => $value,
+                'or' => $or
             ]);
         }
 
@@ -265,15 +284,6 @@ trait RequestParameterParser
      */
     protected function parseFormat($format)
     {
-        switch (mb_strtolower($format)) {
-            case 'xml':
-                return 'xml';
-            case 'json':
-                return 'json';
-            case 'yaml':
-                return 'yaml';
-            default:
-                return 'json';
-        }
+        return mb_strtolower($format);
     }
 }

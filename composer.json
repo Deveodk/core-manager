@@ -11,8 +11,19 @@
         "marquine/eloquent-uuid": "^1.0"
     },
     "require-dev": {
+        "squizlabs/php_codesniffer": "3.*",
+        "php-coveralls/php-coveralls": "1.*",
         "mockery/mockery": "0.9.*",
-        "phpunit/phpunit": "~4.7"
+        "phpunit/phpunit": "~6.4",
+        "orchestra/testbench": "^3.5",
+        "fzaninotto/faker": "^1.7"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "DeveoDK\\Core\\Manager\\ManagerServiceProvider"
+            ]
+        }
     },
     "minimum-stability": "dev",
     "prefer-stable": true,

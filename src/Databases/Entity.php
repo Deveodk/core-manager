@@ -6,15 +6,18 @@ use Illuminate\Database\Eloquent\Model;
 
 class Entity extends Model
 {
-    /** @var string */
-    protected $keyType = 'string';
-
-    /** @var array  */
+    /**
+     * Array of dates
+     * @var array
+     */
     protected $dates = [
         'created_at',
         'updated_at',
     ];
 
-    /** @var array */
+    /**
+     * Array of guarded attributes for mass assignment
+     * @var array
+     */
     protected $guarded = [];
 }
