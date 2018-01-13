@@ -121,6 +121,14 @@ class ElequentBuilder
             $column = $sorting['column'];
             $direction = $sorting['direction'];
 
+            $possibleCustomSort = 'customSort' . ucfirst($column);
+
+            // Custom sort parsing
+            if (method_exists($model, $possibleCustomSort)) {
+                $model->{$possibleCustomSort}($this->getQueryBuilder(), $direction, $table);
+                continue;
+            }
+
             // If the relation has been joined
             if (array_key_exists($table, $joined)) {
                 $this->orderBy($joined[$table], $column, $direction);
@@ -230,6 +238,15 @@ class ElequentBuilder
             $or = $filter['or'];
 
             $columns = $this->getDatabaseColumns($tableName);
+
+            $model = $this->getQueryBuilder()->getModel();
+            $possibleCustomFilter = 'customFilter' . ucfirst($field);
+
+            // Custom filters
+            if (method_exists($model, $possibleCustomFilter)) {
+                $model->{$possibleCustomFilter}($this->getQueryBuilder(), $operator, $value, $or);
+                continue;
+            }
 
             if (!in_array($field, $columns)) {
                 continue;
