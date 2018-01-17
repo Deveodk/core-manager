@@ -1,3 +1,10 @@
+[![Build Status](https://travis-ci.org/Deveodk/core-manager.svg?branch=master)](https://travis-ci.org/Deveodk/core-manager)
+[![Coverage Status](https://coveralls.io/repos/github/Deveodk/core-manager/badge.svg?branch=master)](https://coveralls.io/github/Deveodk/core-manager?branch=master)
+[![Coding Standards](https://img.shields.io/badge/cs-PSR--2--R-yellow.svg)](https://github.com/php-fig-rectified/fig-rectified-standards)
+[![Latest Stable Version](https://poser.pugx.org/deveodk/core-manager/v/stable)](https://packagist.org/packages/deveodk/core-manager)
+[![Total Downloads](https://poser.pugx.org/deveodk/core-manager/downloads)](https://packagist.org/packages/deveodk/core-manager)
+[![License](https://poser.pugx.org/deveodk/core-manager/license)](https://packagist.org/packages/deveodk/core-manager)
+
 ## core-manager
 
 > To be used explicitly with Core by Deveo
@@ -361,6 +368,78 @@ protected function resourceData($data)
 }
 
 ```
+
+## Manager parameters & Querying 
+
+
+Core manager support the following query string parameters, we will go through them. one by one. But here is a quick overview.
+
+
+| NAME     	| DESCRIPTION                                                               	| QUERY STRING 	| DEFAULT              	| ACCEPTS ARRAY 	|   	|
+|----------	|---------------------------------------------------------------------------	|--------------	|----------------------	|---------------	|---	|
+| Field    	| Include only specified fields                                         	| "fields"     	| All available fields 	| YES           	|   	|
+| Format   	| Format the response to either XML, JSON or YAML                           	| "format"     	| JSON                 	| NO            	|   	|
+| Limit    	| Limit the outputtet resources to the given number                         	| "limit"      	| 100            	| NO            	|   	|
+| Page     	| Automaticly paginates the response and gives HATEOS links for navigation  	| "page"       	| No pagination        	| NO            	|   	|
+| Sort     	| Sort values by given parameters                                           	| "sorts"       | No sort              	| YES           	|   	|
+| Includes 	| Includes an specified relationship                                        	| "includes"   	| No includes          	| YES           	|   	|
+| Filters  	| Query the api with specified queries to get only the information you need 	| "filters"    	| No filters           	| YES           	|   	|
+
+#### Fields querying
+
+Core manager support database level filtering of fields to be transformed. 
+
+What that means is that we can query only the fields that we need. This is to optimize performance, and readability.
+
+Lets assume we only need the ``` id ``` and ``` created_at ``` attribute of our entity. 
+
+Then we can append a query string like ``` ?fields=id,created_at``` 
+
+This will render an result that only has the keys ``` id ``` and ``` created_at ``` 
+
+The only exception to this is if your including data. The relation will always be included. 
+
+
+#### Format querying
+
+Core manager has out of the box formatting capabilities for ``` JSON ```, ``` XML ``` & ``` YAML ```
+
+| This can be extended through config options.
+
+
+To format the response to one of the given formats simply query like so
+
+``` ?format=xml ```
+
+This will return an ``` XML ``` response.
+
+
+#### Limit querying
+
+Core manager support limiting the data that are returned. 
+
+| Default the limit is ``` 100 ``` this can be changed in config
+
+
+
+Limit by ``` ?limit=19```
+
+
+#### Page querying
+
+Core manager supports pagination of an given resource. 
+
+To paginate simply pass the page number you wish to be at, a good ideá is starting at 1 to get meta information for the rest of the pagination. 
+
+``` ?page=1 ```
+
+
+#### Include querying
+
+To include 
+
+
+
 
 ---
 
